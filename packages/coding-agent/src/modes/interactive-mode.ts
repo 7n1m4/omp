@@ -5064,10 +5064,6 @@ export class InteractiveMode implements InteractiveModeContext {
 			this.showWarning("Exit goal mode first.");
 			return;
 		}
-		if (this.vibeModeEnabled) {
-			this.showWarning("Exit vibe mode first.");
-			return;
-		}
 
 		this.planModePaused = false;
 
@@ -5304,10 +5300,6 @@ export class InteractiveMode implements InteractiveModeContext {
 		}
 		if (this.planModeEnabled || this.planModePaused) {
 			this.#warnPlanModeBlocks();
-			return;
-		}
-		if (this.vibeModeEnabled) {
-			this.showWarning("Exit vibe mode first.");
 			return;
 		}
 		const previousTools = this.session.getEnabledToolNames().filter(name => name !== "goal");
@@ -6090,10 +6082,6 @@ export class InteractiveMode implements InteractiveModeContext {
 			this.#warnPlanModeBlocks();
 			return false;
 		}
-		if (this.goalModeEnabled || this.goalModePaused) {
-			this.showWarning("Exit goal mode first.");
-			return false;
-		}
 		await this.#enterVibeMode();
 		if (!initialPrompt) return false;
 		if (isKnownSkillCommand(this, initialPrompt)) {
@@ -6209,14 +6197,6 @@ export class InteractiveMode implements InteractiveModeContext {
 			await inFlight;
 			return;
 		}
-		if (this.planModeEnabled || this.planModePaused) {
-			this.#warnPlanModeBlocks();
-			return;
-		}
-		if (this.goalModeEnabled || this.goalModePaused) {
-			this.showWarning("Exit goal mode first.");
-			return;
-		}
 
 		const vibeRegistry = VibeSessionRegistry.global();
 		const ownerScope = vibeRegistry.ownerScope(this.#vibeParentSession());
@@ -6229,6 +6209,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		const previousTools = options?.previousTools ?? this.session.getEnabledToolNames();
 		const vibeBaseTools = ["read"];
 		if (this.session.hasBuiltInTool("todo")) vibeBaseTools.push("todo");
+
 		// The entry runs as a stored promise so a concurrent /vibe joins it
 		// above instead of dispatching on the stale toolset. The first caller
 		// awaits it below, so a failure is always observed (no unhandled
@@ -6321,10 +6302,6 @@ export class InteractiveMode implements InteractiveModeContext {
 			this.#warnPlanModeBlocks();
 			return false;
 		}
-		if (this.vibeModeEnabled) {
-			this.showWarning("Exit vibe mode first.");
-			return false;
-		}
 		if (!cfgGoalEnabled.get(this.session.settings)) {
 			this.showWarning("Goal mode is disabled. Enable it in settings (goal.enabled).");
 			return false;
@@ -6364,10 +6341,6 @@ export class InteractiveMode implements InteractiveModeContext {
 		try {
 			if (this.planModeEnabled || this.planModePaused) {
 				this.#warnPlanModeBlocks();
-				return false;
-			}
-			if (this.vibeModeEnabled) {
-				this.showWarning("Exit vibe mode first.");
 				return false;
 			}
 			if (!cfgGoalEnabled.get(this.session.settings)) {
@@ -8082,6 +8055,11 @@ export class InteractiveMode implements InteractiveModeContext {
 	 * as launch does. Internal resets keep calling handleClearCommand directly.
 	 */
 	async handleNewCommand(): Promise<void> {
+		// Allow /new during vibe mode by exiting vibe first, tearing down
+		// workers/registry/owner scope so they are not orphaned.
+		if (this.vibeModeEnabled) {
+			await this.#exitVibeMode();
+		}
 		const previousSessionId = this.sessionManager.getSessionId();
 		await this.handleClearCommand();
 		if (this.sessionManager.getSessionId() === previousSessionId) return;

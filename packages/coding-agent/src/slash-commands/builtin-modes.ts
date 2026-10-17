@@ -365,7 +365,6 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 			if (!cfgVibeEnabled.get(runtime.ctx.settings)) return "Vibe: disabled in settings";
 			if (runtime.ctx.vibeModeEnabled) return "Vibe: on";
 			if (runtime.ctx.planModeEnabled) return "Vibe: blocked by plan mode";
-			if (runtime.ctx.goalModeEnabled) return "Vibe: blocked by goal mode";
 			return "Vibe: off";
 		},
 		handleTui: async (command, runtime) => {
