@@ -6,6 +6,7 @@ import { orderedSettings } from "./all-settings";
 import { type AnySetting, lookup } from "./registry";
 
 import { cfgPlanAutosave, cfgPlanEnabled } from "../plan-mode/settings";
+import { cfgVibeEnabled } from "../vibe/settings";
 import {
 	cfgRetryUsageAwareFallback,
 	cfgDefaultThinkingLevel,
@@ -35,6 +36,7 @@ const CONDITIONS: Record<string, () => boolean> = {
 	autoThinkingActive: whenSettings(s => cfgDefaultThinkingLevel.get(s) === "auto"),
 	usageAwareFallbackEnabled: whenSettings(s => cfgRetryUsageAwareFallback.get(s) === true),
 	planModeEnabled: whenSettings(s => cfgPlanEnabled.get(s)),
+	vibeModeEnabled: whenSettings(s => cfgVibeEnabled.get(s)),
 	planAutosaveEnabled: whenSettings(s => cfgPlanEnabled.get(s) && cfgPlanAutosave.get(s)),
 	// The editor writes the global layer; hide it so a project-supplied list is never promoted to global.
 	contextFilesExtraNotProject: whenSettings(s => cfgContextFilesExtra.provenance(s) !== "project"),

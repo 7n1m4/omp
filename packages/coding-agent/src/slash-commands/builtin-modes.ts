@@ -44,6 +44,7 @@ import { formatSlowModeResetClock } from "../session/anthropic-slow-mode";
 import { cfgExtendedContext } from "../session/context-settings";
 import { cfgGoalEnabled } from "../goals/settings";
 import { cfgPlanEnabled } from "../plan-mode/settings";
+import { cfgVibeEnabled } from "../vibe/settings";
 
 export function refreshStatusLine(ctx: InteractiveModeContext): void {
 	ctx.statusLine.invalidate();
@@ -361,12 +362,18 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		inlineHint: "[prompt]",
 		allowArgs: true,
 		getTuiAutocompleteDescription: runtime => {
+			if (!cfgVibeEnabled.get(runtime.ctx.settings)) return "Vibe: disabled in settings";
 			if (runtime.ctx.vibeModeEnabled) return "Vibe: on";
 			if (runtime.ctx.planModeEnabled) return "Vibe: blocked by plan mode";
 			if (runtime.ctx.goalModeEnabled) return "Vibe: blocked by goal mode";
 			return "Vibe: off";
 		},
 		handleTui: async (command, runtime) => {
+			if (!cfgVibeEnabled.get(runtime.ctx.settings)) {
+				runtime.ctx.showWarning("Vibe mode is disabled. Enable it in settings (vibe.enabled).");
+				clearSubmittedText(runtime);
+				return;
+			}
 			await runWithDetachedModeDraft(command, runtime, () =>
 				runtime.ctx.handleVibeModeCommand(command.args || undefined, runtime.input),
 			);

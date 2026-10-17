@@ -402,6 +402,7 @@ import { cfgCycleOrder, cfgModelRoles } from "../config/model-settings";
 import { cfgGoalContinuationModes, cfgGoalEnabled } from "../goals/settings";
 import { goalContinuationActivity, goalFromModeData } from "../goals/state";
 import { cfgPlanDefaultOnStartup, cfgPlanEnabled } from "../plan-mode/settings";
+import { cfgVibeDefaultOnStartup, cfgVibeEnabled } from "../vibe/settings";
 import { cfgStreamRedactPatterns } from "../stream/settings";
 import { cfgSttEnabled } from "../stt/settings";
 import { combine, type SettingValueOf } from "../config/registry";
@@ -628,6 +629,20 @@ export function shouldEnterPlanModeOnStartup(
 		!hasExplicitMode &&
 		cfgPlanDefaultOnStartup.get(sessionSettings) &&
 		cfgPlanEnabled.get(sessionSettings)
+	);
+}
+
+export function shouldEnterVibeModeOnStartup(
+	sessionManager: Pick<SessionManager, "buildSessionContext" | "getEntries">,
+	sessionSettings: Settings,
+): boolean {
+	const hasConversationContext = sessionManager.buildSessionContext().messages.length > 0;
+	const hasExplicitMode = sessionManager.getEntries().some(entry => entry.type === "mode_change");
+	return (
+		!hasConversationContext &&
+		!hasExplicitMode &&
+		cfgVibeDefaultOnStartup.get(sessionSettings) &&
+		cfgVibeEnabled.get(sessionSettings)
 	);
 }
 
@@ -2465,6 +2480,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		// never be dragged back into plan mode; user-initiated /new re-applies the
 		// default through handleNewCommand instead.
 		await this.#applyPlanModeDefault();
+		await this.#applyVibeModeDefault();
 
 		// Restore unsent editor draft from previous session shutdown (Ctrl+D).
 		// One-shot: consumeDraft removes the sidecar after read so the next
@@ -4980,6 +4996,10 @@ export class InteractiveMode implements InteractiveModeContext {
 		}
 		this.session.goalRuntime.clearAccounting();
 		if (sessionContext.mode === "vibe") {
+			if (!cfgVibeEnabled.get(this.session.settings)) {
+				this.sessionManager.appendModeChange("none");
+				return;
+			}
 			if (!preserveVibe) {
 				await this.#enterVibeMode({
 					persistModeChange: false,
@@ -5017,6 +5037,18 @@ export class InteractiveMode implements InteractiveModeContext {
 	async #applyPlanModeDefault(): Promise<void> {
 		if (shouldEnterPlanModeOnStartup(this.sessionManager, this.session.settings)) {
 			await this.#enterPlanMode();
+		}
+	}
+
+	/**
+	 * Enters vibe mode when `vibe.defaultOnStartup` applies to the current session
+	 * (see {@link shouldEnterVibeModeOnStartup}). Called at launch and after `/new`.
+	 * #enterVibeMode is idempotent and self-guards against an active plan/goal/vibe
+	 * mode; vibe.enabled is checked by shouldEnterVibeModeOnStartup.
+	 */
+	async #applyVibeModeDefault(): Promise<void> {
+		if (shouldEnterVibeModeOnStartup(this.sessionManager, this.session.settings)) {
+			await this.#enterVibeMode();
 		}
 	}
 
@@ -6046,6 +6078,10 @@ export class InteractiveMode implements InteractiveModeContext {
 		initialPrompt?: string,
 		input?: Pick<SubmittedUserInput, "images" | "imageLinks">,
 	): Promise<boolean> {
+		if (!cfgVibeEnabled.get(this.session.settings)) {
+			this.showWarning("Vibe mode is disabled. Enable it in settings (vibe.enabled).");
+			return false;
+		}
 		if (this.vibeModeEnabled) {
 			await this.#exitVibeMode();
 			return false;
@@ -8050,6 +8086,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		await this.handleClearCommand();
 		if (this.sessionManager.getSessionId() === previousSessionId) return;
 		await this.#applyPlanModeDefault();
+		await this.#applyVibeModeDefault();
 	}
 
 	handleFreshCommand(): Promise<void> {
