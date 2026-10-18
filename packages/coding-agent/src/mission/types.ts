@@ -69,6 +69,8 @@ export type ProgressLogEntry =
 			timestamp: string;
 			workerSessionId?: string;
 			modelId?: string;
+			reasoningEffort?: string;
+			validationModelId?: string;
 			substitutedFromModelId?: string;
 	  }
 	| {
@@ -79,6 +81,8 @@ export type ProgressLogEntry =
 			timestamp: string;
 			workerSessionId?: string;
 			modelId?: string;
+			reasoningEffort?: string;
+			validationModelId?: string;
 			substitutedFromModelId?: string;
 	  }
 	| { type: "worker_selected_feature"; workerId: string; featureId: string; timestamp: string }

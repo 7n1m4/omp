@@ -19,3 +19,24 @@ export async function countsByStatus(svc: MissionFileService): Promise<Record<st
 	for (const e of entries) counts[e.type] = (counts[e.type] ?? 0) + 1;
 	return counts;
 }
+
+export interface ProgressLogAggregate {
+	total: number;
+	byType: Record<string, number>;
+	workerHandoffCount: number;
+	lastWorkerHandoff: WorkerHandoff | undefined;
+}
+
+export async function aggregateProgressLog(svc: MissionFileService): Promise<ProgressLogAggregate> {
+	const entries = await svc.readProgressLog();
+	const byType: Record<string, number> = {};
+	for (const e of entries) byType[e.type] = (byType[e.type] ?? 0) + 1;
+	const handoffs = await svc.filterWorkerHandoffs();
+	const last = handoffs[handoffs.length - 1];
+	return {
+		total: entries.length,
+		byType,
+		workerHandoffCount: handoffs.length,
+		lastWorkerHandoff: last?.handoff,
+	};
+}
