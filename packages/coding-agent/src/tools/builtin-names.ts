@@ -29,6 +29,11 @@ export const BUILTIN_TOOL_NAMES = [
 	"reflect",
 	"learn",
 	"manage_skill",
+	"propose_mission",
+	"start_mission_run",
+	"end_feature_run",
+	"dismiss_handoff_items",
+	"recommend_mission",
 ] as const;
 
 export type BuiltinToolName = (typeof BUILTIN_TOOL_NAMES)[number];

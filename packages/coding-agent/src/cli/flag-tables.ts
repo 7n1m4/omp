@@ -143,6 +143,9 @@ export const STRING_SETTERS: Record<string, StringSetter> = {
 	"--model": (result, value) => {
 		result.model = value;
 	},
+	"--worker-model": (result, value) => {
+		result.workerModel = value;
+	},
 	"--smol": (result, value) => {
 		result.smol = value;
 	},
@@ -330,6 +333,7 @@ export const VALUELESS_FLAGS: ReadonlySet<string> = new Set([
 	"--no-title",
 	"--no-ui",
 	"--auto-approve",
+	"--mission",
 	"--yolo",
 ]);
 

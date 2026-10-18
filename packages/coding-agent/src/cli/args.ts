@@ -52,6 +52,8 @@ export interface Args {
 	hideThinking?: boolean;
 	advisor?: boolean;
 	externalThinking?: boolean;
+	mission?: boolean;
+	workerModel?: string;
 	continue?: boolean;
 	resume?: string | true;
 	/**
@@ -361,6 +363,8 @@ export function parseArgs(inputArgs: string[], extensionFlags?: Map<string, { ty
 			result.advisor = true;
 		} else if (arg === "--external-thinking") {
 			result.externalThinking = true;
+		} else if (arg === "--mission") {
+			result.mission = true;
 		} else if (arg === "--prewalk") {
 			result.prewalk = true;
 		} else if (arg === "--no-prewalk") {
@@ -436,6 +440,9 @@ export function parseArgs(inputArgs: string[], extensionFlags?: Map<string, { ty
 
 	if (result.systemPrompt !== undefined && result.systemPromptTemplate !== undefined) {
 		throw new CliUsageError("--system-prompt and --system-prompt-template cannot be combined");
+	}
+	if (result.workerModel !== undefined && !result.mission) {
+		throw new CliUsageError("--worker-model requires --mission");
 	}
 	return result;
 }

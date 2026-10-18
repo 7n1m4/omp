@@ -838,6 +838,10 @@ export class AgentSession implements SettingsScope {
 	readonly settings: Settings;
 	/** Session-start policy, independent of the selected project memory backend. */
 	readonly memoryEnabled: boolean;
+	missionMode?: boolean;
+	legacyMissionMode?: boolean;
+	missionDir?: string;
+	workerModelOverride?: string;
 	/** Entries of tools mounted under `xd://`; empty when virtual devices are unmounted. */
 	getXdevToolEntries: () => Array<{ name: string; summary: string }>;
 	readonly yieldQueue: YieldQueue;
@@ -1751,6 +1755,10 @@ export class AgentSession implements SettingsScope {
 		this.settings = config.settings;
 		this.#skillDescriptions = config.skillDescriptions ?? new SkillDescriptionCatalog();
 		this.memoryEnabled = config.memoryEnabled ?? true;
+		this.missionMode = config.missionMode;
+		this.legacyMissionMode = config.legacyMissionMode;
+		this.missionDir = config.missionDir;
+		this.workerModelOverride = config.workerModelOverride;
 		this.#modelRegistry = config.modelRegistry;
 		this.#allowSessionModelFallback = config.allowSessionModelFallback === true;
 		this.#interactivePrompts = config.interactivePrompts !== false;
@@ -6727,6 +6735,12 @@ export class AgentSession implements SettingsScope {
 		this.#memory.endLocalMemoryStartup(signal);
 	}
 
+	isMissionMode(): boolean {
+		return this.missionMode === true;
+	}
+	isLegacyMissionMode(): boolean {
+		return this.legacyMissionMode === true;
+	}
 	/** Apply the backend; cwd rebinding can skip Mnemopi auto-retention while still draining writes. */
 	applyMemoryBackend(options: { retainMnemopi?: boolean } = {}): Promise<void> {
 		if (!this.memoryEnabled) return Promise.resolve();

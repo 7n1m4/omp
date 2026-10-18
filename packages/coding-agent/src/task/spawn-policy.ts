@@ -57,6 +57,10 @@ export function resolveSpawnPolicy(parentSpawns: string | boolean | null | undef
 	};
 }
 
+export function resolveSubagentAutonomyLevel(isMissionMode: boolean): "high" | "medium" {
+	return isMissionMode ? "high" : "medium";
+}
+
 /**
  * Whether the `scout` agent is spawnable in a session: not disabled via
  * `task.disabledAgents`, and permitted by the session spawn policy.

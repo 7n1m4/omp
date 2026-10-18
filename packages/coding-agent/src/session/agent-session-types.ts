@@ -217,6 +217,10 @@ export interface AgentSessionConfig {
 	suppressAutoPrewalk?: boolean;
 	/** Force read-only plan mode at start, auto-approve, then switch to the target. */
 	planYolo?: PlanYolo;
+	missionMode?: boolean;
+	legacyMissionMode?: boolean;
+	missionDir?: string;
+	workerModelOverride?: string;
 	/** Initial per-family service tiers for the live session. */
 	serviceTierByFamily?: ServiceTierByFamily;
 	/** Prompt templates for expansion. */

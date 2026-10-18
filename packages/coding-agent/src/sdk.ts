@@ -924,6 +924,12 @@ export interface CreateAgentSessionOptions {
 
 	/** Whether to auto-approve all tool calls (--auto-approve CLI flag). Default: false */
 	autoApprove?: boolean;
+	missionMode?: boolean;
+	legacyMissionMode?: boolean;
+	missionDir?: string;
+	workerBaseId?: string;
+	validatorNames?: string[];
+	workerModelOverride?: string;
 }
 
 /** Result from createAgentSession */
@@ -4062,6 +4068,10 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 				autoQaEnabled: !restrictToolNames && isAutoQaEnabled(settings),
 				writeTransportOnly:
 					toolSession.deviceOnlyWrite === true && toolSession.pendingFullWriteDescription !== true,
+				missionMode: options.missionMode,
+				workerBaseId: options.workerBaseId,
+				validatorNames: options.validatorNames,
+				missionDir: options.missionDir,
 				secretsEnabled: obfuscator?.obfuscates() === true,
 				workspaceTree: workspaceTreePromise ?? emptyWorkspaceTree,
 				includeWorkspaceTree,
@@ -4728,6 +4738,10 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 						return mcpManager.getTools();
 					}
 				: undefined,
+			missionMode: options.missionMode,
+			legacyMissionMode: options.legacyMissionMode,
+			missionDir: options.missionDir,
+			workerModelOverride: options.workerModelOverride,
 			memoryEnabled: !restrictToolNames,
 			memoryAgentDir: agentDir,
 			memoryTaskDepth: taskDepth,

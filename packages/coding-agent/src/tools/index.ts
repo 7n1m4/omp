@@ -141,9 +141,17 @@ export * from "./image-gen";
 export * from "./learn";
 export * from "./manage-skill";
 export * from "./memory-edit";
-export * from "./memory-recall";
 export * from "./memory-reflect";
 export * from "./memory-retain";
+export * from "./memory-recall";
+export * from "./mission";
+import {
+	createProposeMissionTool,
+	createStartMissionRunTool,
+	createEndFeatureRunTool,
+	createDismissHandoffItemsTool,
+	createRecommendMissionTool,
+} from "./mission";
 export * from "./read";
 export * from "./report-tool-issue";
 export * from "./resolve";
@@ -464,6 +472,8 @@ export interface ToolSession {
 	getTodoPhases?: () => TodoPhase[];
 	/** Replace cached todo phases for this session. */
 	setTodoPhases?: (phases: TodoPhase[]) => void;
+	/** Mission directory for mission-mode sessions. */
+	missionDir?: string;
 	/**
 	 * Record todo phases on the session branch. Direct `todo` calls persist via
 	 * their toolResult entry; callers that produce none (the eval bridge) use this
@@ -584,6 +594,11 @@ export const BUILTIN_TOOLS: Record<BuiltinToolName, ToolFactory> = {
 	reflect: MemoryReflectTool.createIf,
 	learn: LearnTool.createIf,
 	manage_skill: ManageSkillTool.createIf,
+	propose_mission: createProposeMissionTool,
+	start_mission_run: createStartMissionRunTool,
+	end_feature_run: createEndFeatureRunTool,
+	dismiss_handoff_items: createDismissHandoffItemsTool,
+	recommend_mission: createRecommendMissionTool,
 };
 
 export const HIDDEN_TOOLS: Record<HiddenToolName, ToolFactory> = {

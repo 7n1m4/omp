@@ -591,8 +591,11 @@ export interface BuildSystemPromptOptions {
 	 * the main agent verifies once after all subagents land, so parallel children don't storm the CPU.
 	 */
 	subagent?: boolean;
+	missionMode?: boolean;
+	missionDir?: string;
+	workerBaseId?: string;
+	validatorNames?: string[];
 }
-
 /** Result of building provider-facing system prompt messages. */
 export interface BuildSystemPromptResult {
 	/** Ordered system prompt blocks. Providers should preserve entries as distinct messages/blocks. */
@@ -1042,5 +1045,16 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 		!resolvedCustomPrompt && xdevTools.length > 0 && rendered.includes("xd://")
 			? xdevTools.map(mounted => mounted.name)
 			: undefined;
+	if (options.missionMode) {
+		const lines = [
+			"## Mission Mode",
+			"You are the orchestrator of a mission.",
+			options.workerBaseId ? `Worker base id: ${options.workerBaseId}` : "",
+			options.validatorNames?.length ? `Validators: ${options.validatorNames.join(", ")}` : "",
+			options.missionDir ? `Mission directory: ${options.missionDir}` : "",
+			options.missionDir ? `See ${options.missionDir}/AGENTS.md for mission conventions.` : "",
+		].filter(Boolean);
+		systemPrompt.push(lines.join("\n"));
+	}
 	return { systemPrompt, xdevCatalogNames };
 }

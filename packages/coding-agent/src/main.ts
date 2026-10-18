@@ -2257,6 +2257,9 @@ export async function runRootCommand(
 		sessionOptions.tuiTranscript = isInteractive;
 		sessionOptions.autoTitle = isInteractive;
 		sessionOptions.settings = settingsInstance;
+		sessionOptions.missionDir = parsedArgs.mission ? `${process.cwd()}/mission` : undefined;
+		sessionOptions.missionMode = parsedArgs.mission;
+		sessionOptions.workerModelOverride = parsedArgs.workerModel;
 		sessionOptions.onPrewalkWarning = warning => {
 			if (isInteractive) notifs.push({ kind: "warn", message: warning });
 			else process.stderr.write(`${chalk.yellow(`Warning: ${warning}`)}\n`);
