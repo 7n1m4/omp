@@ -1681,7 +1681,7 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 	): Promise<AgentToolResult<ReadToolDetails>> {
 		if (this.session.missionDir) {
 			const svc = new MissionFileService(this.session.missionDir);
-			const r = svc.enforceMissionAccess(params.path);
+			const r = await svc.enforceMissionAccess(params.path);
 			if (!r.allowed) throw new ToolError(r.reason ?? "Mission access denied");
 		}
 		const result = await this.#executeInner(toolCallId, params, signal, onUpdate, toolContext);

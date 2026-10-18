@@ -124,30 +124,44 @@ export async function runMission(
 
 		let workerError: string | undefined;
 		let handoff: WorkerHandoff | undefined;
-		try {
-			if (options.spawnWorker) {
-				const result = await options.spawnWorker({
-					session,
-					svc,
-					featureId: f.id,
-					workerModel,
-					workerEffort,
-					validationModel,
-					validationEffort,
-					signal: options.signal,
-				});
-				if (result) handoff = result;
-			} else {
-				handoff = {
-					successState: "success",
-					summary: "Completed",
-					artifacts: [],
-					attempts: f.attempts,
-					retryCount: 0,
-				};
+		const maxRetries = f.maxRetries ?? 0;
+		const delay = f.backoff ?? 250;
+		let retryCount = 0;
+		for (let attempt = 0; attempt <= maxRetries; attempt++) {
+			if (attempt > 0) {
+				retryCount = attempt;
+				const { promise, resolve } = Promise.withResolvers<void>();
+				setTimeout(resolve, delay * Math.pow(2, attempt - 1));
+				await promise;
 			}
-		} catch (err) {
-			workerError = err instanceof Error ? err.message : String(err);
+			try {
+				if (options.spawnWorker) {
+					const result = await options.spawnWorker({
+						session,
+						svc,
+						featureId: f.id,
+						workerModel,
+						workerEffort,
+						validationModel,
+						validationEffort,
+						signal: options.signal,
+					});
+					if (result) handoff = result;
+				} else {
+					handoff = {
+						successState: "success",
+						summary: "Completed",
+						artifacts: [],
+						attempts: f.attempts,
+						retryCount,
+					};
+				}
+				workerError = undefined;
+				break;
+			} catch (err) {
+				workerError = err instanceof Error ? err.message : String(err);
+				if (attempt >= maxRetries) break;
+			}
 		}
 
 		const finalHandoff: WorkerHandoff = handoff ?? {
@@ -155,7 +169,7 @@ export async function runMission(
 			summary: workerError ? `Failed: ${workerError}` : "Completed",
 			artifacts: [],
 			attempts: f.attempts,
-			retryCount: 0,
+			retryCount,
 			lastError: workerError,
 		};
 

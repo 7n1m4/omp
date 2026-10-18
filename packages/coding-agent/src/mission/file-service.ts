@@ -324,10 +324,39 @@ export class MissionFileService {
 		return { success: true, proposalPath };
 	}
 
-	enforceMissionAccess(targetPath: string): MissionAccessResult {
+	async enforceMissionAccess(targetPath: string): Promise<MissionAccessResult> {
+		let base: string;
+		try {
+			base = await fs.realpath(this.#missionDir);
+		} catch {
+			base = path.resolve(this.#missionDir);
+		}
 		const resolved = path.resolve(targetPath);
-		const base = path.resolve(this.#missionDir);
-		if (resolved === base || resolved.startsWith(base + path.sep)) {
+		let realTarget = resolved;
+		try {
+			realTarget = await fs.realpath(resolved);
+		} catch {
+			const segments: string[] = [];
+			let dir = path.dirname(resolved);
+			let baseResolved = false;
+			while (dir && dir !== path.dirname(dir)) {
+				try {
+					const realDir = await fs.realpath(dir);
+					realTarget = path.join(realDir, ...segments.reverse());
+					baseResolved = true;
+					break;
+				} catch {
+					segments.push(path.basename(dir));
+					dir = path.dirname(dir);
+				}
+			}
+			if (!baseResolved) {
+				realTarget = resolved;
+			}
+		}
+		const normBase = base.replace(/\/+$/, "");
+		const normTarget = realTarget.replace(/\/+$/, "");
+		if (normTarget === normBase || normTarget.startsWith(normBase + path.sep)) {
 			return { allowed: true };
 		}
 		return { allowed: false, reason: `Path outside mission directory: ${targetPath}` };

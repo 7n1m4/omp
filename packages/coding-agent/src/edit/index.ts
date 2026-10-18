@@ -501,7 +501,7 @@ export class EditTool implements AgentTool<TInput> {
 		const p = params as Record<string, unknown>;
 		if (this.session.missionDir && typeof p.path === "string") {
 			const svc = new MissionFileService(this.session.missionDir);
-			const r = svc.enforceMissionAccess(p.path);
+			const r = await svc.enforceMissionAccess(p.path);
 			if (!r.allowed) throw new ToolError(r.reason ?? "Mission access denied");
 		}
 		let open = this.#sessions.get(toolCallId);
