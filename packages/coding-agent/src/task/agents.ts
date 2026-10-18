@@ -13,9 +13,10 @@ import scoutMd from "../prompts/agents/scout.md" with { type: "text" };
 import securityReviewerMd from "../prompts/agents/security-reviewer.md" with { type: "text" };
 import seanceMd from "../prompts/agents/seance.md" with { type: "text" };
 import missionWorkerBaseMd from "../prompts/agents/mission-worker-base.md" with { type: "text" };
+import scrutinyValidatorMd from "../prompts/agents/scrutiny-validator.md" with { type: "text" };
+import userTestingValidatorMd from "../prompts/agents/user-testing-validator.md" with { type: "text" };
 import taskMd from "../prompts/agents/task.md" with { type: "text" };
 import { AUTO_THINKING } from "@oh-my-pi/pi-tui/thinking";
-
 import type { AgentSource } from "@oh-my-pi/pi-tui/tools/task";
 import type { AgentDefinition } from "./types";
 
@@ -58,6 +59,28 @@ const EMBEDDED_AGENT_DEFS: EmbeddedAgentDef[] = [
 			thinkingLevel: AUTO_THINKING,
 		},
 		template: missionWorkerBaseMd,
+	},
+	{
+		fileName: "scrutiny-validator.md",
+		frontmatter: {
+			name: "scrutiny-validator",
+			description: "Scrutiny validator agent",
+			spawns: "*",
+			model: "@task",
+			thinkingLevel: AUTO_THINKING,
+		},
+		template: scrutinyValidatorMd,
+	},
+	{
+		fileName: "user-testing-validator.md",
+		frontmatter: {
+			name: "user-testing-validator",
+			description: "User testing validator agent",
+			spawns: "*",
+			model: "@task",
+			thinkingLevel: AUTO_THINKING,
+		},
+		template: userTestingValidatorMd,
 	},
 	{
 		fileName: "task.md",

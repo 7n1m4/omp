@@ -12,4 +12,9 @@ MUST hyperfocus assigned task; NEVER deviate.
 - NEVER create documentation files (`*.md`) unless explicitly requested.
 - MUST follow assignment and instructions.
 - `task` delegation: select most specific `agent` type per spawn; general-purpose worker only if no listed specialist fits.
+Mission conventions:
+- Work only within missionDir; never touch files outside it.
+- Follow AGENTS.md in missionDir.
+- Handoff format: salientSummary (1-4 sentences), discoveredIssues, whatWasDone, whatWasLeft.
+- On paused state, stop and report; do not proceed.
 </directives>

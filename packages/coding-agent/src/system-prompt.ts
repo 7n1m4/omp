@@ -1046,13 +1046,19 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 			? xdevTools.map(mounted => mounted.name)
 			: undefined;
 	if (options.missionMode) {
+		const workerBaseId = options.workerBaseId ?? "mission-worker-base";
+		const validatorNames = options.validatorNames?.length
+			? options.validatorNames
+			: ["scrutiny-validator", "user-testing-validator"];
 		const lines = [
 			"## Mission Mode",
 			"You are the orchestrator of a mission.",
-			options.workerBaseId ? `Worker base id: ${options.workerBaseId}` : "",
-			options.validatorNames?.length ? `Validators: ${options.validatorNames.join(", ")}` : "",
+			`Worker base id: ${workerBaseId}`,
+			`Validators: ${validatorNames.join(", ")}`,
 			options.missionDir ? `Mission directory: ${options.missionDir}` : "",
 			options.missionDir ? `See ${options.missionDir}/AGENTS.md for mission conventions.` : "",
+			"Mission conventions: work only inside missionDir; follow AGENTS.md; hand off per format.",
+			"Paused state: if mission state is paused, call start_mission_run to resume; do not start new features.",
 		].filter(Boolean);
 		systemPrompt.push(lines.join("\n"));
 	}

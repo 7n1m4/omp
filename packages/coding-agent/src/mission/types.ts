@@ -48,11 +48,37 @@ export interface WorkerHandoff {
 	successState: "success" | "failure";
 	summary: string;
 	artifacts: string[];
+	whatWasImplemented?: string;
+	whatWasLeftUndone?: string;
+	verification?: string;
+	commitId?: string;
+	repoPath?: string;
+	attempts?: number;
+	retryCount?: number;
+	lastError?: string;
 }
 
 export type ProgressLogEntry =
-	| { type: "worker_started"; workerId: string; featureId: string; timestamp: string }
-	| { type: "worker_completed"; workerId: string; featureId: string; handoff: WorkerHandoff; timestamp: string }
+	| {
+			type: "worker_started";
+			workerId: string;
+			featureId: string;
+			timestamp: string;
+			workerSessionId?: string;
+			modelId?: string;
+			substitutedFromModelId?: string;
+	  }
+	| {
+			type: "worker_completed";
+			workerId: string;
+			featureId: string;
+			handoff: WorkerHandoff;
+			timestamp: string;
+			workerSessionId?: string;
+			modelId?: string;
+			substitutedFromModelId?: string;
+	  }
+	| { type: "worker_selected_feature"; workerId: string; featureId: string; timestamp: string }
 	| { type: "mission_paused"; pauseReason: string; timestamp: string };
 
 export interface MissionModelSettings {

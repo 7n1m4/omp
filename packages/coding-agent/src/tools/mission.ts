@@ -2,6 +2,7 @@ import type { ToolSession } from ".";
 import type { AgentTool } from "@oh-my-pi/pi-agent-core";
 import { type as arkType } from "@oh-my-pi/omptype";
 import { MissionFileService } from "../mission/file-service";
+import { runMission } from "../mission/runner";
 
 function makeTool(
 	session: ToolSession,
@@ -28,6 +29,7 @@ const startSchema = arkType({});
 const endFeatureSchema = arkType({ featureId: "string" });
 const dismissSchema = arkType({ items: "string[]" });
 const recommendSchema = arkType({ reason: "string" });
+const resumeSchema = arkType({});
 
 export function createProposeMissionTool(session: ToolSession): AgentTool | null {
 	return makeTool(session, "propose_mission", "Propose a mission", proposeSchema, async (svc, p) => {
@@ -38,8 +40,8 @@ export function createProposeMissionTool(session: ToolSession): AgentTool | null
 }
 
 export function createStartMissionRunTool(session: ToolSession): AgentTool | null {
-	return makeTool(session, "start_mission_run", "Start a mission run", startSchema, async svc => {
-		const r = await svc.startMissionRun();
+	return makeTool(session, "start_mission_run", "Start a mission run", startSchema, async () => {
+		const r = await runMission(session);
 		return JSON.stringify(r);
 	});
 }
@@ -47,7 +49,10 @@ export function createStartMissionRunTool(session: ToolSession): AgentTool | nul
 export function createEndFeatureRunTool(session: ToolSession): AgentTool | null {
 	return makeTool(session, "end_feature_run", "End a feature run", endFeatureSchema, async (svc, p) => {
 		const params = p as { featureId: string };
-		const r = await svc.endFeatureRun(params.featureId);
+		if (typeof params.featureId !== "string" || params.featureId.trim().length === 0) {
+			return JSON.stringify({ success: false, error: "featureId must be a non-empty string" });
+		}
+		const r = await svc.endFeatureRun(params.featureId.trim());
 		return JSON.stringify(r);
 	});
 }
@@ -55,6 +60,9 @@ export function createEndFeatureRunTool(session: ToolSession): AgentTool | null 
 export function createDismissHandoffItemsTool(session: ToolSession): AgentTool | null {
 	return makeTool(session, "dismiss_handoff_items", "Dismiss handoff items", dismissSchema, async (svc, p) => {
 		const params = p as { items: string[] };
+		if (!Array.isArray(params.items)) {
+			return JSON.stringify({ success: false, error: "items must be an array of strings" });
+		}
 		const r = await svc.dismissHandoffItems(params.items);
 		return JSON.stringify(r);
 	});
@@ -64,6 +72,13 @@ export function createRecommendMissionTool(session: ToolSession): AgentTool | nu
 	return makeTool(session, "recommend_mission", "Recommend a mission", recommendSchema, async (svc, p) => {
 		const params = p as { reason: string };
 		const r = await svc.recommendMission(params.reason);
+		return JSON.stringify(r);
+	});
+}
+
+export function createResumeMissionTool(session: ToolSession): AgentTool | null {
+	return makeTool(session, "resume_mission", "Resume a paused mission", resumeSchema, async svc => {
+		const r = await svc.resumeMission();
 		return JSON.stringify(r);
 	});
 }
