@@ -22,6 +22,7 @@ import {
 	writeArchive,
 } from "@oh-my-pi/pi-utils/ar";
 import { normalizeToLF } from "../edit/normalize";
+import { MissionFileService } from "../mission/file-service";
 
 import { extractUriScheme, InternalUrlRouter, sessionResolveContext, sessionWriteContext } from "../internal-urls";
 import { createLspWritethrough, type WritethroughCallback, writethroughNoop } from "../lsp";
@@ -794,6 +795,11 @@ export class WriteTool implements AgentTool<typeof writeSchema, WriteToolDetails
 		const router = InternalUrlRouter.instance();
 		const recovered = recoverConflictUriPrefix(router.peelWriteSelector(unwrapHashlineHeaderPath(rawPath), "write"));
 		const path = recovered.path;
+		if (this.session.missionDir) {
+			const svc = new MissionFileService(this.session.missionDir);
+			const r = svc.enforceMissionAccess(path);
+			if (!r.allowed) throw new ToolError(r.reason ?? "Mission access denied");
+		}
 		const target = router.writeTarget(path);
 		const policy = target?.spec.write;
 		if (rawContent === undefined && !(target && policy?.contentOptional?.(target.url))) {

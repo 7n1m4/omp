@@ -151,6 +151,7 @@ import {
 	createEndFeatureRunTool,
 	createDismissHandoffItemsTool,
 	createRecommendMissionTool,
+	createResumeMissionTool,
 } from "./mission";
 export * from "./read";
 export * from "./report-tool-issue";
@@ -599,6 +600,7 @@ export const BUILTIN_TOOLS: Record<BuiltinToolName, ToolFactory> = {
 	end_feature_run: createEndFeatureRunTool,
 	dismiss_handoff_items: createDismissHandoffItemsTool,
 	recommend_mission: createRecommendMissionTool,
+	resume_mission: createResumeMissionTool,
 };
 
 export const HIDDEN_TOOLS: Record<HiddenToolName, ToolFactory> = {

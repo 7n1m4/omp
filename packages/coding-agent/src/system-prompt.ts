@@ -1058,7 +1058,7 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 			options.missionDir ? `Mission directory: ${options.missionDir}` : "",
 			options.missionDir ? `See ${options.missionDir}/AGENTS.md for mission conventions.` : "",
 			"Mission conventions: work only inside missionDir; follow AGENTS.md; hand off per format.",
-			"Paused state: if mission state is paused, call start_mission_run to resume; do not start new features.",
+			"Paused state: if mission state is paused, call resume_mission to resume; do not start new features.",
 		].filter(Boolean);
 		systemPrompt.push(lines.join("\n"));
 	}

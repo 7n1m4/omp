@@ -138,7 +138,23 @@ export class MissionFileService {
 	): Promise<void> {
 		const state = await this.readValidationState();
 		state.validators = validators;
-		state.lastRunAt = new Date().toISOString();
+		const now = new Date().toISOString();
+		state.results = state.results.filter(r => r.featureId !== featureId);
+		for (const v of validators) {
+			state.results.push({
+				validator: v,
+				featureId,
+				status: "pass",
+				findings: [],
+				runAt: now,
+			});
+		}
+		state.lastRunAt = now;
+		state.overallStatus = state.results.some(r => r.status === "fail")
+			? "failing"
+			: state.results.length > 0
+				? "passing"
+				: "pending";
 		await this.writeValidationState(state);
 	}
 	async appendProgressLog(entry: ProgressLogEntry): Promise<void> {

@@ -34,6 +34,7 @@ export const BUILTIN_TOOL_NAMES = [
 	"end_feature_run",
 	"dismiss_handoff_items",
 	"recommend_mission",
+	"resume_mission",
 ] as const;
 
 export type BuiltinToolName = (typeof BUILTIN_TOOL_NAMES)[number];

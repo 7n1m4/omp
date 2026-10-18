@@ -18,6 +18,9 @@ export interface MissionFeature {
 	handoffId: string | null;
 	createdAt: string;
 	updatedAt: string;
+	attempts?: number;
+	maxRetries?: number;
+	backoff?: number;
 }
 
 export interface MissionFeaturesFile {

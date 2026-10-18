@@ -15,6 +15,7 @@ import type {
 	ToolSpeculationExecutionContext,
 	ToolTier,
 } from "@oh-my-pi/pi-agent-core";
+import { MissionFileService } from "../mission/file-service";
 import { completeSimple, type ImageContent, type TextContent } from "@oh-my-pi/pi-ai";
 import {
 	BINARY_SNIFF_BYTES,
@@ -1678,6 +1679,11 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 		onUpdate?: AgentToolUpdateCallback<ReadToolDetails>,
 		toolContext?: AgentToolContext,
 	): Promise<AgentToolResult<ReadToolDetails>> {
+		if (this.session.missionDir) {
+			const svc = new MissionFileService(this.session.missionDir);
+			const r = svc.enforceMissionAccess(params.path);
+			if (!r.allowed) throw new ToolError(r.reason ?? "Mission access denied");
+		}
 		const result = await this.#executeInner(toolCallId, params, signal, onUpdate, toolContext);
 		const displayTarget = InternalUrlRouter.instance().locateSync(params.path);
 		if (displayTarget && result.details) result.details.displayTarget = displayTarget;

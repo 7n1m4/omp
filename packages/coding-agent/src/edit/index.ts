@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import { MissionFileService } from "../mission/file-service";
 import type {
 	AgentTool,
 	AgentToolArgStream,
@@ -497,6 +498,12 @@ export class EditTool implements AgentTool<TInput> {
 		_onUpdate?: AgentToolUpdateCallback<EditToolDetails, TInput>,
 		context?: AgentToolContext,
 	): Promise<AgentToolResult<EditToolDetails, TInput>> {
+		const p = params as Record<string, unknown>;
+		if (this.session.missionDir && typeof p.path === "string") {
+			const svc = new MissionFileService(this.session.missionDir);
+			const r = svc.enforceMissionAccess(p.path);
+			if (!r.allowed) throw new ToolError(r.reason ?? "Mission access denied");
+		}
 		let open = this.#sessions.get(toolCallId);
 		const argsJson = JSON.stringify(params);
 		if (open && this.#streamedArgs.get(toolCallId) !== argsJson) {
