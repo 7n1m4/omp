@@ -441,9 +441,6 @@ export function parseArgs(inputArgs: string[], extensionFlags?: Map<string, { ty
 	if (result.systemPrompt !== undefined && result.systemPromptTemplate !== undefined) {
 		throw new CliUsageError("--system-prompt and --system-prompt-template cannot be combined");
 	}
-	if (result.workerModel !== undefined && !result.mission) {
-		throw new CliUsageError("--worker-model requires --mission");
-	}
 	return result;
 }
 

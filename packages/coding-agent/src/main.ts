@@ -143,6 +143,7 @@ import { EventBus } from "./utils/event-bus";
 import { resolveFirstLaunchPythonEvalWarning } from "./eval/startup-warning";
 import { CliUsageError } from "./cli/usage-error";
 import { cfgGoalEnabled } from "./goals/settings";
+import { cfgMissionMode, cfgMissionWorkerModelOverride } from "./mission/settings";
 import { cfgPlanDefaultOnStartup, cfgPlanEnabled } from "./plan-mode/settings";
 
 import { cfgAdvisorEnabled } from "./advisor/settings";
@@ -2257,9 +2258,16 @@ export async function runRootCommand(
 		sessionOptions.tuiTranscript = isInteractive;
 		sessionOptions.autoTitle = isInteractive;
 		sessionOptions.settings = settingsInstance;
-		sessionOptions.missionDir = parsedArgs.mission ? `${process.cwd()}/mission` : undefined;
-		sessionOptions.missionMode = parsedArgs.mission;
-		sessionOptions.workerModelOverride = parsedArgs.workerModel;
+		const missionFromFlag = parsedArgs.mission;
+		const missionFromSetting = cfgMissionMode.get(settingsInstance);
+		const effectiveMission = missionFromFlag !== undefined ? missionFromFlag : missionFromSetting;
+		if (parsedArgs.workerModel !== undefined && !effectiveMission) {
+			throw new CliUsageError("--worker-model requires --mission");
+		}
+		sessionOptions.missionDir = effectiveMission ? `${process.cwd()}/mission` : undefined;
+		sessionOptions.missionMode = effectiveMission;
+		sessionOptions.workerModelOverride =
+			parsedArgs.workerModel ?? cfgMissionWorkerModelOverride.get(settingsInstance);
 		sessionOptions.onPrewalkWarning = warning => {
 			if (isInteractive) notifs.push({ kind: "warn", message: warning });
 			else process.stderr.write(`${chalk.yellow(`Warning: ${warning}`)}\n`);
