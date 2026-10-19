@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- New `/mission` slash command to relaunch omp in mission mode
+
 ## [18.12.1] - 2026-10-17
 
 ### Breaking Changes

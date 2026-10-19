@@ -41,7 +41,7 @@ describe("InteractiveMode restart", () => {
 		resetSettingsForTest();
 	});
 
-	async function restart(argv: string[]): Promise<string[]> {
+	async function restart(argv: string[], extra?: readonly string[]): Promise<string[]> {
 		const modelRegistry = new ModelRegistry(authStorage);
 		const model = modelRegistry.find("anthropic", "claude-sonnet-4-5");
 		if (!model) throw new Error("expected bundled model");
@@ -61,7 +61,7 @@ describe("InteractiveMode restart", () => {
 		vi.spyOn(postmortem, "cleanup").mockResolvedValue();
 		vi.spyOn(postmortem, "drainStdout").mockResolvedValue();
 		vi.spyOn(postmortem, "quit").mockResolvedValue();
-		await mode.restart();
+		await mode.restart(extra);
 		const command = process.platform === "win32" ? spawn.mock.calls[0]?.[0] : exec.mock.calls[0]?.[0];
 		if (!Array.isArray(command)) throw new Error("expected replacement command");
 		return command;
@@ -155,5 +155,13 @@ describe("InteractiveMode restart", () => {
 		expect(sessionManager.isSessionOnDisk()).toBe(false);
 		if (!file) throw new Error("expected allocated journal path");
 		expect(await Bun.file(file).exists()).toBe(false);
+	});
+
+	it("merges injected launch flags into the relaunch command", async () => {
+		const command = await restart(["--model", "anthropic/claude-sonnet-4-5", "hello"], ["--mission"]);
+		const parsed = parseArgs(command.slice(command.indexOf("--mission")));
+		expect(parsed.mission).toBe(true);
+		expect(parsed.model).toBe("anthropic/claude-sonnet-4-5");
+		expect(parsed.messages).toEqual([]);
 	});
 });

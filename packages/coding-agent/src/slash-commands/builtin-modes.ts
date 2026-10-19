@@ -276,6 +276,16 @@ export function formatTokenCount(value: number): string {
 
 export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 	{
+		name: "mission",
+		icon: "goal",
+		description: "Start mission mode (relaunches omp in mission mode)",
+		handleTui: async (_command, runtime) => {
+			clearSubmittedText(runtime);
+			runtime.ctx.showWarning("Relaunching in mission mode...");
+			await runtime.ctx.restart(["--mission"]);
+		},
+	},
+	{
 		name: "security",
 		icon: "shield",
 		description: "Plan, run, inspect, import, and compare OMP-native security scans",

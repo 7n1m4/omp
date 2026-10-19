@@ -298,7 +298,7 @@ export interface InteractiveModeContext {
 	playWelcomeIntro(): void;
 	shutdown(): Promise<void>;
 	/** Tear down like {@link shutdown}, then relaunch the CLI with the original launch flags, resuming this session. */
-	restart(): Promise<void>;
+	restart(extraLaunchArgs?: readonly string[]): Promise<void>;
 	/** Request graceful shutdown at the next fully settled boundary, including background turns. */
 	requestShutdown(): void;
 	checkShutdownRequested(): Promise<void>;
