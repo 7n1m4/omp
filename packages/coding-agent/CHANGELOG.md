@@ -4,7 +4,16 @@
 
 ### Added
 
-- New `/mission` slash command to relaunch omp in mission mode
+- Added support for the mission.mode and mission.workerModelOverride settings, so enabling mission mode in settings now works at launch without the --mission flag
+- Added /mission to enable mission mode in the current session, without relaunching omp
+
+### Changed
+
+- /mission now activates mission mode in the running session instead of relaunching omp; mission tools are available on the next turn
+
+### Fixed
+
+- Fixed mission settings rendering without a section heading in the Tasks tab of the settings UI
 
 ## [18.12.1] - 2026-10-17
 
