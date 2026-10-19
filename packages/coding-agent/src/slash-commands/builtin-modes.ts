@@ -278,11 +278,12 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 	{
 		name: "mission",
 		icon: "goal",
-		description: "Start mission mode (relaunches omp in mission mode)",
-		handleTui: async (_command, runtime) => {
+		description: "Start mission mode",
+		handleTui: async (command, runtime) => {
 			clearSubmittedText(runtime);
-			runtime.ctx.showWarning("Relaunching in mission mode...");
-			await runtime.ctx.restart(["--mission"]);
+			await runWithDetachedModeDraft(command, runtime, () =>
+				runtime.ctx.handleMissionModeCommand(command.args || undefined, runtime.input),
+			);
 		},
 	},
 	{

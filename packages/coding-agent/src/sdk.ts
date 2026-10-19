@@ -2344,6 +2344,9 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 			get skills() {
 				return session?.skills ?? skills;
 			},
+			get missionDir() {
+				return session?.missionDir;
+			},
 			refreshSkills: () => session.refreshSkills(),
 			rules: allRules,
 			activeRules: [...rulebookRules, ...alwaysApplyRules, ...ttsrManager.getRules()],
@@ -3670,6 +3673,37 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 			return goalRegistration;
 		};
 
+		let missionRegistration: Promise<boolean> | undefined;
+		const ensureMissionRegistered = (): Promise<boolean> => {
+			if (toolRegistry.has("propose_mission")) return Promise.resolve(true);
+			missionRegistration ??= (async () => {
+				const names = [
+					"propose_mission",
+					"start_mission_run",
+					"end_feature_run",
+					"dismiss_handoff_items",
+					"recommend_mission",
+					"resume_mission",
+				];
+				for (const name of names) {
+					if (toolRegistry.has(name)) continue;
+					const tool = await logger.time(
+						`createTools:${name}:mission`,
+						BUILTIN_TOOLS[name as keyof typeof BUILTIN_TOOLS],
+						toolSession,
+					);
+					if (!tool) continue;
+					const native = wrapToolWithMetaNotice(tool);
+					toolRegistry.set(tool.name, new ExtensionToolWrapper(native, extensionRunner) as Tool);
+					builtInRegistryToolNames.add(tool.name);
+					nativeToolsByName.set(tool.name, native);
+				}
+				return toolRegistry.has("propose_mission");
+			})().finally(() => {
+				missionRegistration = undefined;
+			});
+			return missionRegistration;
+		};
 		// `tools.xdev` flips allocate or release the `xd://` state createTools builds
 		// over the canonical map; the session re-partitions on its next apply. Like
 		// createTools, mounting needs a built-in `write` transport.
@@ -4068,10 +4102,10 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 				autoQaEnabled: !restrictToolNames && isAutoQaEnabled(settings),
 				writeTransportOnly:
 					toolSession.deviceOnlyWrite === true && toolSession.pendingFullWriteDescription !== true,
-				missionMode: options.missionMode,
+				missionMode: session?.missionMode ?? options.missionMode,
 				workerBaseId: options.workerBaseId,
 				validatorNames: options.validatorNames,
-				missionDir: options.missionDir,
+				missionDir: session?.missionDir ?? options.missionDir,
 				secretsEnabled: obfuscator?.obfuscates() === true,
 				workspaceTree: workspaceTreePromise ?? emptyWorkspaceTree,
 				includeWorkspaceTree,
@@ -4781,6 +4815,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 				toolSession.pendingFullWriteDescription = enabled ? true : undefined;
 			},
 			ensureGoalRegistered,
+			ensureMissionRegistered,
 			reconcileSettingsGatedTools,
 			getMcpServerInstructions: mcpManager
 				? () => {

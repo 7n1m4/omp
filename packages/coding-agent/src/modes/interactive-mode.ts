@@ -400,6 +400,8 @@ import { cfgExpandThinkingBlocks, cfgProseOnlyThinking } from "../session/settin
 import { cfgHideThinkingBlock } from "../session/settings";
 import { cfgCycleOrder, cfgModelRoles } from "../config/model-settings";
 import { cfgGoalContinuationModes, cfgGoalEnabled } from "../goals/settings";
+import { MissionFileService } from "../mission/file-service";
+import { cfgMissionWorkerModelOverride } from "../mission/settings";
 import { goalContinuationActivity, goalFromModeData } from "../goals/state";
 import { cfgPlanDefaultOnStartup, cfgPlanEnabled } from "../plan-mode/settings";
 import { cfgVibeDefaultOnStartup, cfgVibeEnabled } from "../vibe/settings";
@@ -6334,6 +6336,46 @@ export class InteractiveMode implements InteractiveModeContext {
 		if (!objective) return false;
 		return await this.#startGoalFromObjective(objective, input);
 	}
+	async handleMissionModeCommand(
+		rest?: string,
+		input?: Pick<SubmittedUserInput, "images" | "imageLinks">,
+	): Promise<boolean> {
+		if (this.planModeEnabled || this.planModePaused) {
+			this.#warnPlanModeBlocks();
+			return false;
+		}
+		if (this.session.isMissionMode()) {
+			this.showStatus("Mission mode is already active.");
+			return false;
+		}
+		const missionDir = `${process.cwd()}/mission`;
+		await new MissionFileService(missionDir).initMissionDir();
+		this.session.missionMode = true;
+		this.session.missionDir = missionDir;
+		this.session.workerModelOverride = cfgMissionWorkerModelOverride.get(this.session.settings) ?? undefined;
+		const registered = await this.session.ensureMissionRegistered();
+		if (!registered) {
+			this.showError("Mission mode could not be enabled: mission tools failed to register.");
+			return false;
+		}
+		// Suppress cache-miss marker on the next turn: mission mode changes the
+		// injected context, which predictably invalidates the cache.
+		this.lastAssistantUsage = undefined;
+		const enabled = this.session.getEnabledToolNames();
+		const missionTools = [
+			"propose_mission",
+			"start_mission_run",
+			"end_feature_run",
+			"dismiss_handoff_items",
+			"recommend_mission",
+			"resume_mission",
+		];
+		await this.session.setActiveToolsByName([...new Set([...enabled, ...missionTools])]);
+		this.sessionManager.appendModeChange("mission", { missionDir });
+		this.showStatus(`Mission mode enabled. Mission directory: ${missionDir}`);
+		return false;
+	}
+
 	async handleGuidedGoalCommand(
 		rest?: string,
 		input?: Pick<SubmittedUserInput, "images" | "imageLinks">,

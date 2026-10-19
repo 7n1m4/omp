@@ -887,6 +887,7 @@ export class AgentSession implements SettingsScope {
 
 	readonly #models: ModelControls;
 	readonly #tools: SessionTools;
+	readonly #ensureMissionRegistered?: () => Promise<boolean>;
 	readonly #prewalk: PrewalkCoordinator;
 
 	readonly #providerBoundary: SessionProviderBoundary;
@@ -2203,6 +2204,7 @@ export class AgentSession implements SettingsScope {
 			sessionAgents: () => this.getSessionAgents(),
 			waitForUser: dialog => this.waitForUser(dialog),
 		};
+		this.#ensureMissionRegistered = config.ensureMissionRegistered;
 		this.#tools = new SessionTools(sessionToolsHost, {
 			autoApprove: config.autoApprove,
 			toolRegistry: config.toolRegistry,
@@ -6737,6 +6739,10 @@ export class AgentSession implements SettingsScope {
 
 	isMissionMode(): boolean {
 		return this.missionMode === true;
+	}
+
+	async ensureMissionRegistered(): Promise<boolean> {
+		return (await this.#ensureMissionRegistered?.()) ?? false;
 	}
 	isLegacyMissionMode(): boolean {
 		return this.legacyMissionMode === true;
