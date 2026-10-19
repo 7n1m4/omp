@@ -281,9 +281,7 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		description: "Start mission mode",
 		handleTui: async (command, runtime) => {
 			clearSubmittedText(runtime);
-			await runWithDetachedModeDraft(command, runtime, () =>
-				runtime.ctx.handleMissionModeCommand(command.args || undefined, runtime.input),
-			);
+			await runWithDetachedModeDraft(command, runtime, () => runtime.ctx.handleMissionModeCommand());
 		},
 	},
 	{

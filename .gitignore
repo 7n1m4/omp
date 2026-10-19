@@ -53,6 +53,7 @@ packages/ai/test/.temp-images/
 .worktree/
 compaction-results/
 changes/
+/mission/
 __pycache__/
 
 # Scratch files

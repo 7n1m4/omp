@@ -6336,10 +6336,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		if (!objective) return false;
 		return await this.#startGoalFromObjective(objective, input);
 	}
-	async handleMissionModeCommand(
-		rest?: string,
-		input?: Pick<SubmittedUserInput, "images" | "imageLinks">,
-	): Promise<boolean> {
+	async handleMissionModeCommand(): Promise<boolean> {
 		if (this.planModeEnabled || this.planModePaused) {
 			this.#warnPlanModeBlocks();
 			return false;
@@ -7278,7 +7275,7 @@ export class InteractiveMode implements InteractiveModeContext {
 	 * exec. On Windows (no exec semantics) or on exec failure, falls back to
 	 * spawning the replacement and lingering only to forward its exit code.
 	 */
-	async restart(extraLaunchArgs?: readonly string[]): Promise<void> {
+	async restart(): Promise<void> {
 		if (this.#isShuttingDown) return;
 		this.#beginClose();
 		try {
@@ -7289,7 +7286,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		}
 
 		const sessionFile = this.sessionManager.isSessionOnDisk() ? this.sessionManager.getSessionFile() : undefined;
-		const launchArgv = extraLaunchArgs ? [...extraLaunchArgs, ...process.argv.slice(2)] : process.argv.slice(2);
+		const launchArgv = process.argv.slice(2);
 		const cmd = [
 			...resolveCliEntryCmd(),
 			...restartArgv(launchArgv, sessionFile ? path.resolve(sessionFile) : undefined),
