@@ -2,7 +2,7 @@ import type { ToolSession } from ".";
 import type { AgentTool } from "@oh-my-pi/pi-agent-core";
 import { type as arkType } from "@oh-my-pi/omptype";
 import { MissionFileService } from "../mission/file-service";
-import { runMission } from "../mission/runner";
+import { NO_WORKER_SPAWNER_ERROR } from "../mission/runner";
 
 function makeTool(
 	session: ToolSession,
@@ -41,8 +41,11 @@ export function createProposeMissionTool(session: ToolSession): AgentTool | null
 
 export function createStartMissionRunTool(session: ToolSession): AgentTool | null {
 	return makeTool(session, "start_mission_run", "Start a mission run", startSchema, async () => {
-		const r = await runMission(session);
-		return JSON.stringify(r);
+		// Nothing in this build spawns a `mission-worker-base` subagent, so a run would
+		// mark every feature completed without doing any work. Bail out before the
+		// runner starts mutating mission state; it independently refuses to fabricate a
+		// handoff if some caller ever reaches it without a spawner.
+		return JSON.stringify({ success: false, error: NO_WORKER_SPAWNER_ERROR });
 	});
 }
 

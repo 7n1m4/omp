@@ -9,6 +9,14 @@ import {
 import { aggregateProgressLog } from "./progress-log";
 import type { ProgressLogEntry, WorkerHandoff } from "./types";
 
+/**
+ * Why a feature attempt cannot run: `runMission` requires `options.spawnWorker`
+ * because nothing else in the harness can launch a `mission-worker-base` subagent.
+ * Recorded as the feature's `workerError` so the run reports failure instead of
+ * fabricating a `success` handoff and marking the feature `completed`.
+ */
+export const NO_WORKER_SPAWNER_ERROR = "No worker spawner configured: runMission requires options.spawnWorker";
+
 export interface RetryBackoffOptions {
 	maxAttempts?: number;
 	attempts?: number;
@@ -147,17 +155,14 @@ export async function runMission(
 						signal: options.signal,
 					});
 					if (result) handoff = result;
+					workerError = undefined;
 				} else {
-					handoff = {
-						successState: "success",
-						summary: "Completed",
-						artifacts: [],
-						attempts: f.attempts,
-						retryCount,
-					};
+					// No spawner means no worker ever ran: the feature is NOT done.
+					// Never fabricate a handoff here — a fake success silently marks
+					// the feature completed when the user runs a mission run.
+					workerError = NO_WORKER_SPAWNER_ERROR;
 				}
-				workerError = undefined;
-				break;
+				if (!workerError || attempt >= maxRetries) break;
 			} catch (err) {
 				workerError = err instanceof Error ? err.message : String(err);
 				if (attempt >= maxRetries) break;
@@ -173,7 +178,9 @@ export async function runMission(
 			lastError: workerError,
 		};
 
-		f.status = "completed";
+		if (!workerError) {
+			f.status = "completed";
+		}
 		f.updatedAt = new Date().toISOString();
 		await svc.writeFeatures(features);
 
