@@ -38,6 +38,11 @@ export class MissionFileService {
 		this.#missionDir = missionDir;
 	}
 
+	/** Mission directory this service owns. Read by the mission assignment renderer. */
+	missionDir(): string {
+		return this.#missionDir;
+	}
+
 	async #atomicWrite(filePath: string, data: string): Promise<void> {
 		const tmp = `${filePath}.tmp`;
 		await Bun.write(tmp, data);

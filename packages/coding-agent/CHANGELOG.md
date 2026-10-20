@@ -13,6 +13,7 @@
 
 ### Fixed
 
+- Mission runs now execute work: `start_mission_run` spawns a `mission-worker-base` subagent per feature, honours `MISSION_WORKER_MODEL`/`MISSION_WORKER_REASONING_EFFORT`, validates the child's handoff against a schema, and aborts a run mid-flight instead of continuing on cancelled
 - Fixed mission settings rendering without a section heading in the Tasks tab of the settings UI
 
 ## [18.12.1] - 2026-10-17
