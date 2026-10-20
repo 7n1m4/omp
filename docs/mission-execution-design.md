@@ -213,27 +213,69 @@ None of the four currently reaches a spawn — they only decorate progress-log e
 `settings.missionModelSettings` and has **no caller in `src/`** — only
 `test/mission-subsystem.test.ts:124-126`. Dead until a spawner reads it.
 
-### 1.7 The three other live gaps (verified)
+### 1.7 Remaining live gaps (verified)
 
-**C5 validators** — `src/mission/file-service.ts:135-154`:
+**C5 validators** — FIXED in the working tree (uncommitted; lands with the C5/C6/C7 work). `src/mission/file-service.ts` no longer fabricates `pass`:
+`runValidators` now takes an optional third parameter, an injected execution seam
+`spawnValidator?: (validator, featureId) => Promise<{ status; findings }>`. With no seam, each result is
+`status: "fail"` with findings `["validator <name> did not run: no spawner configured"]` (never a
+fabricated pass); the seam's verdict is recorded verbatim; a throwing validator yields `fail` with the
+error message. `ValidationStatus` stays `"pass" | "fail" | "skipped"` and `types.ts` was not modified.
+Residual (honest): validators still do not actually execute in a real mission run, because nothing wires a
+real `spawnValidator` — the sole caller is `src/mission/runner.ts:210` (`await svc.runValidators(f.id)`)
+with no seam, so a real run now records `fail` "did not run: no spawner configured". The seam is
+injected rather than spawning directly because `runStructuredSubagent` requires a full `ToolSession`,
+which `MissionFileService` (holding only a directory string) cannot reach; synthesizing a stub session
+was rejected as worse than the bug. `validationModel`/`validationEffort` remain resolved but unused.
+Wiring a real spawner is still outstanding.
 
-```ts
-async runValidators(featureId: string, validators: string[] = ["scrutiny-validator", "user-testing-validator"]): Promise<void> {
-	...
-	for (const v of validators) {
-		state.results.push({ validator: v, featureId, status: "pass", findings: [], runAt: now });
-```
+**C6 ordering** — FIXED in the working tree (uncommitted; lands with the C5/C6/C7 work). `endFeatureRun` in `file-service.ts` (~line 300) decides
+scope growth BEFORE any write; on pause it returns `{ success: true, paused: true, completed: false }`
+without persisting `completed`, leaving the feature `in_progress` (no `paused`/`failed` variant was
+invented). The two outcomes are mutually exclusive by construction (the pause branch returns early, so
+`completed` can never be `true` alongside `paused: true`). Return type unchanged; callers needed no
+change (`createEndFeatureRunTool` in `src/tools/mission.ts:234-243` is an opaque `JSON.stringify`
+pass-through).
 
-Nothing executes. Sole caller is `src/mission/runner.ts:202-206` (post-fix), which retries it under
-`retryWithBackoff`. `validationModel`/`validationEffort` are resolved but never used anywhere.
+**C7 persistence** — FIXED in the working tree (uncommitted; lands with the C5/C6/C7 work). A new module
+`src/mission/handoff-store.ts` now backs `handoffs/`: `handoffSlug(featureId)` gives a stable file stem,
+mirroring `sanitizeIdbName` (`src/ida/store.ts:207-210`) - keep `[A-Za-z0-9._-]`, cap at
+`MAX_SLUG_LENGTH = 48`, and append an 8-char `Bun.hash` digest whenever sanitizing changed the id. The
+digest is deliberate: `feature/one` and `feature_one` sanitize identically and `__f1__` trims to `f1`, so
+without it one feature's handoff silently overwrites another's. `handoffPath(missionDir, featureId)` is
+`<missionDir>/handoffs/<slug>.json`, one file per feature. `writeHandoff(missionDir, handoff, featureId)`
+is pretty-printed like the other mission state files and written via temp file + rename, so a crash
+mid-write cannot truncate an earlier handoff; a synthesized failure handoff is persisted unchanged with
+its `lastError`. `readLatestHandoff(svc, featureId)` reads that file and, when it is absent (a mission dir
+predating the store), falls back to `filterWorkerHandoffs()` from `progress-log.ts`, taking the last
+entry - reuse rather than a second way to read the same thing.
 
-**C6 ordering** — `src/mission/file-service.ts:272-281`: marks `completed` and writes, _then_ checks
-`checkScopeGrowth()`, then returns `success: true` even when `paused`. `endFeatureRun` cannot distinguish
-"worker succeeded" from "worker failed".
+`runMission` now persists the handoff after the `worker_completed` progress entry on the success path
+(`await writeHandoff(svc.missionDir(), finalHandoff, f.id)`), and has a single validation failure path
+covering BOTH sources - a rethrow from `retryWithBackoff` AND a recorded `status: "fail"` that resolved
+normally, via a new `failingValidatorFindings(svc, f.id)` helper in `runner.ts`, which is exactly the
+second, subtler half of the bug originally documented here. On validation failure it writes the handoff
+with `lastError`, appends a knowingly-failed `validation` result when the crash left state stale, pauses
+the mission with `pauseReason = "validation_failed: <featureId>"`, appends a `mission_paused` progress
+entry, reopens the feature from `completed` back to `in_progress`, and returns
+`{ success: false, paused: true, validationFailed, validationError, aggregate }`. It threads
+`options.spawnValidator` into `svc.runValidators(f.id, undefined, options.spawnValidator)`.
 
-**C7 persistence** — `src/mission/file-service.ts:47-52` creates `transcripts/` and `handoffs/`; nothing
-writes into either. Handoffs exist only in `progress_log.jsonl` (`file-service.ts:160-163`,
-`filterWorkerHandoffs` `:178-183`).
+That whole block is gated on `workerError === undefined`. A failed worker never produced work to
+validate, so validating it is not possible and recording validators as `fail` would misreport a
+worker failure as a validation failure. `workerError` is the precise signal - "no worker ran" - and is
+deliberately not `finalHandoff.successState`, which is `"failure"` for a handoff a worker honestly
+reported as failed work. The gate sits outside the `try` so a skipped validation cannot be misread as
+a validation crash by the `catch`.
+
+Residual (honest): `RunMissionOptions.spawnValidator` is declared and threaded but `src/tools/mission.ts`
+passes no spawner into `runMission` (verified: no `spawnValidator` in that file) - the same fail-closed
+residual as C5. Real validators still never execute in a live run; the change makes failure honest and
+durable, not absent. `initMissionDir` still creates the `transcripts/` and `handoffs/` directories, but
+only `handoffs/` now has content. Return-shape addition: `runMission` also returns
+`validationFailed`/`validationError` on the failure path; the only caller is `runMissionWithWorker`
+(`src/tools/mission.ts:208`), consumed at `:229` by a whole-object `JSON.stringify`, so the addition is
+additive and no caller destructures or type-narrows the old shape.
 
 ### 1.8 Cancellation
 
@@ -295,7 +337,7 @@ be fabricated. Work happens through the platform's best-exercised spawn path.
   per spawn. Mitigation is a tagged session agent (`model: [workerModel]`) — mechanism exists
   (`ToolSession.getSessionAgents`, used at `src/task/index.ts:739`) but is still not per-feature.
 - **The turn still blocks** for whichever feature is in flight.
-- **C5/C6/C7 unchanged** — the same three gaps remain, exactly as under B.
+- **C5/C6/C7 fixed** (validators no longer fabricate pass; endFeatureRun ordering; handoffs now persisted and validation failure now pauses), all uncommitted; the residual is that no `spawnValidator` is wired yet.
 
 **Interaction with the runner's existing logic.** Delete: the per-feature loop
 (`runner.ts:104-201`, and the second cancel block `:224-233`), `worker_started`/`worker_completed`
@@ -412,9 +454,7 @@ subagent; `workerModel`/`workerEffort` (`runner.ts:76-81`) finally reach a spawn
 threaded (`runner.ts:81`, `:214-233`); and the second cancel check after each feature has a worker
 to actually cancel.
 
-**What it leaves.** C5 still stamps `"pass"` — `runValidators` has no spawn hook (adding
-`RunMissionOptions.spawnValidator` is the same mechanism one step later). C6 unchanged. C7 unchanged (one
-`Bun.write` + a call site). The tool call blocks the turn for the whole mission — no timeout applies,
+**What it leaves.** C5 fabrication fixed and C7 handoffs now persist (both still fail-closed on the unwired `spawnValidator`); C6 fixed. The tool call blocks the turn for the whole mission — no timeout applies,
 because `task` is not in `TOOL_TIMEOUTS` (`src/tools/tool-timeouts.ts:10-20`).
 
 **Interaction with the runner's existing logic.** Keep everything. The only behavioural change is that
@@ -457,10 +497,10 @@ cases.
 | Testability                 | no unit tests for the loop; LLM/eval only                                          | unit-testable today via a stub `spawnWorker`                                                                         |
 | Silent no-op risk           | the LLM can stop, stall, or mark done without work                                 | fails loudly — `NO_WORKER_SPAWNER_ERROR` with no spawner; loud per-feature failure inside                            |
 | Retry / backoff             | gone or advisory                                                                   | preserved verbatim                                                                                                   |
-| Scope growth / pause        | still callable; ordering unenforced                                                | still callable (`runner.ts:224-233`); C6 fix independent                                                             |
-| C5 validators               | unchanged — still fake `"pass"`                                                    | unchanged — but the primitive now exists, so C5 is a small `spawnValidator`                                          |
-| C6 `endFeatureRun` order    | unchanged                                                                          | unchanged                                                                                                            |
-| C7 handoff persistence      | unchanged                                                                          | unchanged (one write + call site)                                                                                    |
+| Scope growth / pause        | fixed (C6) — scope check before write                                              | still callable (`runner.ts:224-233`); ordering now enforced                                                          |
+| C5 validators               | fabrication fixed (seam exists, unwired)                                           | fabrication fixed; wiring a real spawner still outstanding                                                           |
+| C6 `endFeatureRun` order    | fixed                                                                              | fixed                                                                                                                |
+| C7 handoff persistence      | fixed (handoff store + validation-failure pause)                                   | fixed                                                                                                                |
 | Blocking                    | `start_mission_run` blocks for the whole run                                       | same                                                                                                                 |
 | New risk introduced         | none                                                                               | first tool-to-spawn path; bypasses `tools.approval`; full tool surface for the worker                                |
 
@@ -468,7 +508,7 @@ cases.
 
 ## 5. Recommendation
 
-**Option B**, with `signal` threading in the same change and C6 fixed in the same pass.
+**Option B**, with `signal` threading in the same change and C6 fixed (in the working tree, uncommitted; lands with the C5/C6/C7 work).
 
 1. **The anticipated blocker does not exist.** `runStructuredSubagent` needs only a `ToolSession`, and
    `src/eval/agent-bridge.ts:217` already does exactly this from code. The cost is glue, not plumbing, so
@@ -488,10 +528,7 @@ cases.
 interactive missions — with `end_feature_run` and the runner's status machinery as the enforcement floor
 underneath. B is a prerequisite for that, not a competing choice.
 
-**Prerequisite order:** (i) `spawnWorker` + `signal`; (ii) C6 `endFeatureRun` ordering, three lines in
-`file-service.ts:272-281`; (iii) C5 as `RunMissionOptions.spawnValidator` with the same primitive — it is
-the same mechanism one step later and it is the reason to put the assignment template in a shared module.
-C7 can ride along with the handoff mapping.
+**Prerequisite order:** (i) `spawnWorker` + `signal`; (ii) C6 `endFeatureRun` ordering — done in the working tree (uncommitted; lands with the C5/C6/C7 work); (iii) C5 wiring a real `spawnValidator` — fabrication fixed, wiring still outstanding (the C7 work landed without wiring one).
 
 ---
 

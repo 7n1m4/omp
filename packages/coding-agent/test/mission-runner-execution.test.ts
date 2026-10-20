@@ -118,9 +118,20 @@ describe("runMission with a worker spawner", () => {
 		vi.restoreAllMocks();
 	});
 
-	it("drives a feature from pending through in_progress to completed when the worker succeeds", async () => {
+	it("advances a feature through in_progress and reopens it when no validator ran", async () => {
 		// Prevents: a spawned worker run that never advances feature status, leaving
-		// the mission stuck on `pending` and reporting nothing was done.
+		// the mission stuck on `pending` and reporting nothing was done — and the
+		// inverse failure, a successful worker marking the feature `completed` while
+		// no validator ever verified it. This test drives `runMission` directly with
+		// no `spawnValidator`, the same unfilled seam every direct call hits: the
+		// worker's success carries the feature through its stages, but validation
+		// records `status: "fail"` for both validators because nothing executed them,
+		// so the run reports `success: false` and the feature is not left `completed`.
+		//
+		// Deliberate contract change: this test previously asserted
+		// `success: true` and `status: "completed"` on exactly this setup, which
+		// encoded unvalidated work as validated success. The unchanged setup is
+		// still the point — only the expectation now matches the honest default.
 		using tempDir = TempDir.createSync("@mission-run-ok-");
 		const dir = tempDir.path();
 		await writePendingFeature(dir);
@@ -139,10 +150,15 @@ describe("runMission with a worker spawner", () => {
 			},
 		});
 
-		expect(result.success).toBe(true);
+		expect(result.success).toBe(false);
+		expect(result.validationFailed).toBe("f1");
+		expect(result.validationError).toContain("no spawner configured");
 		expect(observed).toEqual(["event:worker_started", "status:in_progress", "event:worker_completed:success"]);
 		const features = await readFeatures(dir);
-		expect(features.features[0].status).toBe("completed");
+		// A worker that succeeded is not a validated feature: with no
+		// `spawnValidator` wired, no validator ran, so `runValidators` records
+		// `status: "fail"` for both validators and the run reopens the feature.
+		expect(features.features[0].status).toBe("in_progress");
 	});
 
 	it("retries a throwing worker with backoff and leaves the feature in_progress when every attempt fails", async () => {

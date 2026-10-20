@@ -137,20 +137,51 @@ export class MissionFileService {
 	async writeValidationState(data: ValidationState): Promise<void> {
 		await this.#atomicWrite(path.join(this.#missionDir, "validation-state.json"), JSON.stringify(data, null, 2));
 	}
+	/**
+	 * Run the feature's validators and record what each one actually reported.
+	 *
+	 * `spawnValidator` is the seam that executes one named validator. Without it no
+	 * validator ran at all, and recording `status: "pass"` anyway is the
+	 * fabricated-result bug this method exists to prevent -- the same class as a
+	 * mission run reporting success with no worker, whose precedent is
+	 * `NO_WORKER_SPAWNER_ERROR` in `mission/runner.ts`. Wire the seam from
+	 * `RunMissionOptions.spawnValidator` (one closure capturing the `ToolSession`,
+	 * which this service does not hold) to make validators execute for real.
+	 */
 	async runValidators(
 		featureId: string,
 		validators: string[] = ["scrutiny-validator", "user-testing-validator"],
+		spawnValidator?: (
+			validator: string,
+			featureId: string,
+		) => Promise<{ status: ValidationState["results"][number]["status"]; findings: string[] }>,
 	): Promise<void> {
 		const state = await this.readValidationState();
 		state.validators = validators;
 		const now = new Date().toISOString();
 		state.results = state.results.filter(r => r.featureId !== featureId);
 		for (const v of validators) {
+			// A validator that did not run, or that failed, is a failing result --
+			// never a pass. `status: "pass"` here is the fabricated-validation bug.
+			let status: ValidationState["results"][number]["status"] = "fail";
+			let findings: string[] = [];
+			if (!spawnValidator) {
+				findings = [`validator ${v} did not run: no spawner configured`];
+			} else {
+				try {
+					const outcome = await spawnValidator(v, featureId);
+					status = outcome.status;
+					findings = outcome.findings;
+				} catch (err) {
+					const message = err instanceof Error ? err.message : String(err);
+					findings = [`validator ${v} could not run: ${message}`];
+				}
+			}
 			state.results.push({
 				validator: v,
 				featureId,
-				status: "pass",
-				findings: [],
+				status,
+				findings,
 				runAt: now,
 			});
 		}
@@ -274,16 +305,20 @@ export class MissionFileService {
 		if (!feature) {
 			return { success: false };
 		}
+		// Scope growth is a function of the feature count alone -- it does not read one
+		// feature's status -- so deciding it before any write leaves `features.json`
+		// unable to claim `completed` for a feature whose run the mission just halted.
+		// The old order persisted `completed` first and discovered the pause afterwards,
+		// so a halted run still left a durable record saying the work was done.
+		const paused = await this.checkScopeGrowth();
+		if (paused) {
+			return { success: true, paused: true, completed: false };
+		}
 		feature.status = "completed";
 		feature.updatedAt = new Date().toISOString();
 		await this.writeFeatures(features);
-		const paused = await this.checkScopeGrowth();
-		let completed = false;
-		if (!paused) {
-			const c = await this.completeIfAllFeaturesDone();
-			completed = c.completed;
-		}
-		return { success: true, paused, completed };
+		const c = await this.completeIfAllFeaturesDone();
+		return { success: true, paused: false, completed: c.completed };
 	}
 
 	async checkScopeGrowth(): Promise<boolean> {

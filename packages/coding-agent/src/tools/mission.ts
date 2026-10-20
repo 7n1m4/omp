@@ -7,8 +7,11 @@ import type { SingleResult, StructuredSubagentOutput } from "@oh-my-pi/pi-tui/to
 import { MissionFileService } from "../mission/file-service";
 import { NO_WORKER_SPAWNER_ERROR, runMission, type RunMissionWorkerContext } from "../mission/runner";
 import { runStructuredSubagent, type StructuredSubagentResult } from "../task/structured-subagent";
-import type { MissionFeature, WorkerHandoff } from "../mission/types";
+import { handoffSlug } from "../mission/handoff-store";
+import { getMissionValidationWorkerModel, getMissionValidationWorkerReasoningEffort } from "../config/mission-worker";
+import type { MissionFeature, ValidationStatus, WorkerHandoff } from "../mission/types";
 import missionAssignmentTemplate from "../prompts/agents/mission-assignment.md" with { type: "text" };
+import missionValidationTemplate from "../prompts/agents/mission-validation-assignment.md" with { type: "text" };
 
 const proposeSchema = arkType({ proposal: "string" });
 const startSchema = arkType({});
@@ -47,6 +50,53 @@ export function renderMissionAssignment(feature: MissionFeature, missionDir: str
 			mission_dir: missionDir,
 		})
 		.trim();
+}
+
+/**
+ * Contract a validator child yields. Declared here rather than trusted from the
+ * child's prose, exactly like `WORKER_HANDOFF_SCHEMA`: `runStructuredSubagent`
+ * validates against it, so a validator that cannot produce a verdict is a failed
+ * validation rather than a `pass` nobody earned.
+ */
+const VALIDATOR_VERDICT_SCHEMA = {
+	type: "object",
+	required: ["status", "findings"],
+	properties: {
+		status: { type: "string", enum: ["pass", "fail", "skipped"] },
+		findings: { type: "array", items: { type: "string" } },
+	},
+};
+
+/** Render one validator's assignment from the static validation template. */
+function renderMissionValidationAssignment(validator: string, feature: MissionFeature, missionDir: string): string {
+	return prompt
+		.render(missionValidationTemplate, {
+			validator_name: validator,
+			feature_id: feature.id,
+			feature_title: feature.title,
+			feature_description: feature.description,
+			mission_dir: missionDir,
+			handoff_slug: handoffSlug(feature.id),
+		})
+		.trim();
+}
+
+/**
+ * Why a settled child run is not a usable validator verdict, or `undefined` when
+ * it is: an error, an abort, a nonzero exit, structured output that did not
+ * validate, or no structured output at all. The validator's contract is to yield
+ * a verdict, so a run without one produced nothing to judge the feature by.
+ */
+function missionValidatorFailure(result: SingleResult): string | undefined {
+	if (result.error) return result.error;
+	if (result.aborted) return result.abortReason ?? `validator ${result.agent} was aborted`;
+	const structured: StructuredSubagentOutput | undefined = result.structuredOutput;
+	if (structured && structured.status !== "valid") {
+		return structured.error ?? "validator output failed schema validation";
+	}
+	if (result.exitCode !== 0) return `validator ${result.agent} exited with code ${result.exitCode}`;
+	if (!structured) return `validator ${result.agent} returned no structured output`;
+	return undefined;
 }
 
 /**
@@ -172,6 +222,106 @@ export async function spawnMissionWorker(context: RunMissionWorkerContext): Prom
 	return toWorkerHandoff(context.featureId, execution);
 }
 
+/**
+ * Convert a settled validator run into the `{ status, findings }` verdict the
+ * runner's `spawnValidator` seam expects, throwing on every outcome that is not
+ * a real verdict. `runValidators` catches per-validator throws and records them
+ * as `status: "fail"` with the reason, so an unrun validator reaches the feature
+ * instead of ever surfacing as a pass.
+ */
+function toValidatorVerdict(
+	validator: string,
+	featureId: string,
+	execution: StructuredSubagentResult,
+): {
+	status: ValidationStatus;
+	findings: string[];
+} {
+	const result: SingleResult = execution.result;
+	const failure = missionValidatorFailure(result);
+	if (failure) throw new Error(`Validator ${validator} on feature ${featureId}: ${failure}`);
+
+	const data: unknown = result.structuredOutput?.data;
+	if (data === undefined || data === null) {
+		throw new Error(`Validator ${validator} on feature ${featureId}: produced no verdict`);
+	}
+	const record = data as Record<string, unknown>;
+	const status = recordString(record, "status");
+	if (status !== "pass" && status !== "fail" && status !== "skipped") {
+		throw new Error(
+			`Validator ${validator} on feature ${featureId}: verdict status was ${JSON.stringify(record.status)}`,
+		);
+	}
+	const rawFindings: unknown = record.findings;
+	if (!Array.isArray(rawFindings)) {
+		throw new Error(`Validator ${validator} on feature ${featureId}: verdict is missing findings`);
+	}
+	const findings = rawFindings.filter((item): item is string => typeof item === "string");
+	// A `skipped` verdict is not fabricated as a `fail`: the validator declined to
+	// judge the feature, and recording it honestly as `skipped` keeps that a
+	// deliberate, visible outcome. It still blocks validation —
+	// `failingValidatorFindings` treats anything that is not `pass` as failing.
+	return { status, findings };
+}
+
+/**
+ * Spawn one named validator child for a feature and return what it found.
+ *
+ * The seam signature is `(validator, featureId)`, and `runValidators` calls it
+ * once per name with the same closure — so neither the validator nor the feature
+ * may be closed over. The `ToolSession` the tool factory holds is the only source
+ * for a spawn, and `validationModel`/`validationEffort` are read from the same
+ * mission settings the runner reads, so a validator run resolves its model and
+ * effort exactly as the worker run does.
+ *
+ * Every failure — a throw, a crash, an abort, a nonzero exit, output that never
+ * validated, or an absent verdict — surfaces as an error. `runValidators` records
+ * it as `status: "fail"` with the reason, and the runner's
+ * `failingValidatorFindings` turns the recorded result into a run failure, so an
+ * unvalidated feature can never report validated success.
+ */
+async function spawnMissionValidator(
+	validator: string,
+	featureId: string,
+	session: ToolSession,
+	signal?: AbortSignal,
+): Promise<{ status: ValidationStatus; findings: string[] }> {
+	if (!session.missionDir) {
+		throw new Error(`Validator ${validator} cannot run: the session has no mission directory`);
+	}
+	const svc = new MissionFileService(session.missionDir);
+	const feature = await readFeature(svc, featureId);
+	if (!feature) {
+		throw new Error(`Feature ${featureId} is not listed in features.json`);
+	}
+	const assignment = renderMissionValidationAssignment(validator, feature, svc.missionDir());
+	const model = getMissionValidationWorkerModel()?.trim() || undefined;
+	const effort = resolveEffort(getMissionValidationWorkerReasoningEffort());
+	const execution = await runStructuredSubagent({
+		session,
+		invocationKind: "task",
+		assignment,
+		agent: validator,
+		outputSchema: VALIDATOR_VERDICT_SCHEMA,
+		structured: true,
+		...(model !== undefined ? { model } : {}),
+		...(effort !== undefined ? { effort } : {}),
+		...(signal !== undefined ? { signal } : {}),
+	});
+	return toValidatorVerdict(validator, featureId, execution);
+}
+
+/**
+ * The `spawnValidator` seam bound to one session's `ToolSession` and mission dir.
+ * The tool's `signal` is carried through so Ctrl-C reaches the validator children
+ * exactly as it reaches the worker — without it a cancelled run leaves both
+ * validators executing against a feature the user already abandoned.
+ */
+function missionValidatorSpawner(session: ToolSession, signal?: AbortSignal) {
+	return async (validator: string, featureId: string): Promise<{ status: ValidationStatus; findings: string[] }> =>
+		await spawnMissionValidator(validator, featureId, session, signal);
+}
+
 function makeTool(
 	session: ToolSession,
 	name: string,
@@ -199,13 +349,24 @@ function makeTool(
 }
 
 /**
- * Wire the runner to the spawner. `RunMissionWorkerContext.session` is this same
- * `ToolSession`, and `StructuredSubagentRequest.session` accepts exactly that
- * type, so it is handed through with no adaptation.
+ * Wire the runner to both spawners. `RunMissionWorkerContext.session` is this
+ * same `ToolSession`, and `StructuredSubagentRequest.session` accepts exactly
+ * that type, so it is handed through with no adaptation.
+ *
+ * `spawnValidator` is filled from here because it is the only place a `ToolSession`
+ * exists: `MissionFileService` — where `runValidators` lives — holds just a
+ * directory string, and `runStructuredSubagent` needs a full session. Without this
+ * seam `runValidators` records `status: "fail"` for every validator, which
+ * correctly fails the run, so leaving it unfilled made every real mission run fail
+ * its validation stage instead of ever validating anything.
  */
 function runMissionWithWorker(session: ToolSession, signal?: AbortSignal): Promise<Record<string, unknown>> {
 	if (!session.missionDir) return Promise.resolve({ success: false, error: NO_WORKER_SPAWNER_ERROR });
-	return runMission(session, { spawnWorker: spawnMissionWorker, ...(signal !== undefined ? { signal } : {}) });
+	return runMission(session, {
+		spawnWorker: spawnMissionWorker,
+		spawnValidator: missionValidatorSpawner(session, signal),
+		...(signal !== undefined ? { signal } : {}),
+	});
 }
 
 export function createProposeMissionTool(session: ToolSession): AgentTool | null {
