@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  Built by <a href="https://stencil.so">Stencil Labs</a> · Fork of <a href="https://github.com/badlogic/pi-mono">Pi</a> by <a href="https://github.com/mariozechner">@mariozechner</a>
+  Built by <a href="https://stencil.so">Stencil Labs</a> & <a href="https://github.com/anlma">Anima Labs</a>· Fork of <a href="https://github.com/badlogic/pi-mono">Pi</a> by <a href="https://github.com/mariozechner">@mariozechner</a>
 </p>
 
 The most capable agent surface that ships. Continuously tuned by real-world use — complete out of the box, open all the way down.
@@ -39,8 +39,6 @@ The most capable agent surface that ships. Continuously tuned by real-world use 
 ```sh
 curl -fsSL https://omp.sh/install | sh
 ```
-
-Without a usable bun (or with `--binary`), the install scripts fetch the prebuilt binary from `build.stencil.so` and check its SHA-256 before installing it. Pin a release with `curl -fsSL https://omp.sh/install | sh -s -- --binary --ref v<version>` (PowerShell: `-Binary -Ref v<version>`).
 
 > **Alpine / musl:** the prebuilt musl binary links `libstdc++`/`libgcc` dynamically, which stock Alpine does not ship. Install them first: `apk add libstdc++ libgcc`.
 
@@ -702,11 +700,13 @@ component-local notices for attribution and additional terms.
 © 2025 Mario Zechner  
 © 2025-2026 Can Bölük  
 © 2026 [Stencil Labs, Inc.](https://stencil.so)
+© 4ever [Anima Labs, NPO](https://github.com/anlma)
 
 _made for terminals that stay open_
 
 - [omp.sh](https://omp.sh)
 - [Stencil Labs](https://stencil.so)
+- [Anima Labs](https://github.com/anlma)
 - [GitHub](https://github.com/can1357/oh-my-pi)
 - [Changelog](https://github.com/can1357/oh-my-pi/blob/main/packages/coding-agent/CHANGELOG.md)
 - [npm](https://www.npmjs.com/package/@oh-my-pi/pi-coding-agent)
