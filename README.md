@@ -700,13 +700,13 @@ component-local notices for attribution and additional terms.
 © 2025 Mario Zechner  
 © 2025-2026 Can Bölük  
 © 2026 [Stencil Labs, Inc.](https://stencil.so)
-© 4ever [Anima Labs, NPO](https://github.com/anlma)
+© 4ever [Anima Labs, NPO](https://github.com/anlmalabs)
 
 _made for terminals that stay open_
 
 - [omp.sh](https://omp.sh)
 - [Stencil Labs](https://stencil.so)
-- [Anima Labs](https://github.com/anlma)
+- [Anima Labs](https://github.com/anlmalabs)
 - [GitHub](https://github.com/can1357/oh-my-pi)
 - [Changelog](https://github.com/can1357/oh-my-pi/blob/main/packages/coding-agent/CHANGELOG.md)
 - [npm](https://www.npmjs.com/package/@oh-my-pi/pi-coding-agent)
